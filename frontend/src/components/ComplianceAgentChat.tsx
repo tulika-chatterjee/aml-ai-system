@@ -40,8 +40,8 @@ export function ComplianceAgentChat({ context }: Props) {
     try {
       const res = await api.complianceChat({ message: trimmed, context });
       setMessages((m) => [...m, { role: "assistant", text: res.reply }]);
-    } catch {
-      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
       const offline = synthesizeComplianceReplyLocal(trimmed, context, { offlineNote: true });
       setMessages((m) => [...m, { role: "assistant", text: offline }]);
     } finally {

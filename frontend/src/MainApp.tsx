@@ -139,7 +139,7 @@ export function MainApp({ onSignOut }: Props) {
       <button type="button" className="btn primary sm" disabled={busy} onClick={runDetect}>
         Run detection cycle
       </button>
-      <button type="button" className="btn sm" disabled={busy} onClick={() => refresh().catch((e) => setError(String(e)))}>
+      <button type="button" className="btn sm" disabled={busy} onClick={() => refresh().catch((e) => setError(String((e as Error).message)))}>
         Refresh alerts
       </button>
       <button type="button" className="btn ghost sm" onClick={onSignOut}>
