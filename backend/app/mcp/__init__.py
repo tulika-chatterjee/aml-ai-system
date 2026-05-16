@@ -1,0 +1,1 @@
+"""MCP capability manifest stubs."""

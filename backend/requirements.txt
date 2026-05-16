@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+greenlet
+aiosqlite
+asyncpg
+pydantic
+pydantic-settings
+python-multipart
+networkx
+aiokafka

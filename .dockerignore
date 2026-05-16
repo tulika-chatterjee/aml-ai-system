@@ -1,0 +1,14 @@
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.venv
+**/node_modules
+frontend/dist
+backend/.venv
+backend/aml_intel.db
+**/*.db
+.cursor
+docs/
+notebooks/
