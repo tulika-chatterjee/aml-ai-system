@@ -9,3 +9,5 @@ pydantic-settings
 python-multipart
 networkx
 aiokafka
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
