@@ -1,4 +1,5 @@
 import { AGENT_PIPELINE } from "../agents/catalog";
+import { apiBase } from "../api";
 
 type Props = {
   apiLine: string;
@@ -33,8 +34,17 @@ export function SettingsPage({ apiLine }: Props) {
         <h3 className="invest-heading">API</h3>
         <p className="invest-body">{apiLine}</p>
         <p className="muted small">
-          Frontend proxies <code className="inline-code">/api</code> to <code className="inline-code">127.0.0.1:8000</code>{" "}
-          (Vite dev server).
+          {apiBase ? (
+            <>
+              Production API base: <code className="inline-code">{apiBase}</code>
+            </>
+          ) : (
+            <>
+              Local dev proxies <code className="inline-code">/api</code> to{" "}
+              <code className="inline-code">127.0.0.1:8000</code>. On Vercel set{" "}
+              <code className="inline-code">VITE_API_URL</code> to your Render origin and redeploy.
+            </>
+          )}
         </p>
       </section>
 

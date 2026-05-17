@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactElement } from "react";
-import { AlertDetail, AlertSummary, api } from "./api";
+import { AlertDetail, AlertSummary, api, apiBase } from "./api";
 import { AppShell, NavKey } from "./components/AppShell";
 import { DashboardPage } from "./pages/DashboardPage";
 import { CustomersPage } from "./pages/CustomersPage";
@@ -48,8 +48,13 @@ export function MainApp({ onSignOut }: Props) {
         setStatus("API reachable");
         setApiOnline(true);
       })
-      .catch(() => {
-        setStatus("API offline — start FastAPI on :8000");
+      .catch((e) => {
+        const msg = (e as Error).message;
+        setStatus(
+          apiBase
+            ? `API unreachable — ${msg}`
+            : `API not configured — set VITE_API_URL on Vercel to your Render URL`,
+        );
         setApiOnline(false);
       });
     refresh().catch((e) => setError(String((e as Error).message)));

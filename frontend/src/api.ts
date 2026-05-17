@@ -1,5 +1,5 @@
 /** Set `VITE_API_URL` on Vercel to your Render API origin, e.g. https://aml-api.onrender.com */
-const BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+export const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
 export type AlertSummary = {
   id: string;
@@ -20,16 +20,43 @@ export type AlertDetail = AlertSummary & {
   explanation: string | null;
 };
 
+function apiConfigHint(): string {
+  if (apiBase) {
+    return `API base: ${apiBase}. Check Render is up and CORS_ORIGINS includes this Vercel URL.`;
+  }
+  return "Set VITE_API_URL on Vercel to your Render URL (e.g. https://your-api.onrender.com), then redeploy.";
+}
+
+async function parseJson<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  const trimmed = text.trimStart();
+  if (trimmed.startsWith("<!") || trimmed.startsWith("<html")) {
+    throw new Error(apiConfigHint());
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      trimmed
+        ? `Invalid JSON from API: ${trimmed.slice(0, 120)}`
+        : `Empty response from API. ${apiConfigHint()}`,
+    );
+  }
+}
+
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${apiBase}${path}`, {
     headers: { "Content-Type": "application/json" },
     ...init,
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`${res.status} ${text}`);
+    if (text.trimStart().startsWith("<!")) {
+      throw new Error(apiConfigHint());
+    }
+    throw new Error(`${res.status} ${text.slice(0, 200)}`);
   }
-  return res.json() as Promise<T>;
+  return parseJson<T>(res);
 }
 
 export type CaseOpenResponse = { case_id: string };

@@ -12,6 +12,12 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const base = normalizeBase(env.VITE_BASE_PATH);
 
+  if (mode === "production" && process.env.VERCEL && !env.VITE_API_URL?.trim()) {
+    console.warn(
+      "[aml-ai-dashboard] VITE_API_URL is not set. API calls will fail until you add it in Vercel → Settings → Environment Variables.",
+    );
+  }
+
   return {
     plugins: [react()],
     base,

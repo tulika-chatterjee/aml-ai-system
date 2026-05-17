@@ -3,5 +3,8 @@
   "installCommand": "cd frontend && npm install --include=dev",
   "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "handle": "filesystem" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
 }
