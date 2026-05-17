@@ -40,6 +40,8 @@ _extra = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[*_local_origins, *_extra],
+    # Demo deploys: allow any *.vercel.app preview/production URL without listing each one.
+    allow_origin_regex=r"https://([a-z0-9-]+\.)*vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
