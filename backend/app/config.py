@@ -27,6 +27,9 @@ class Settings(BaseSettings):
 
     regulatory_docs_path: str = "data/regulatory"
 
+    # Comma-separated browser origins (e.g. https://your-app.vercel.app)
+    cors_origins: str = ""
+
 
 def regulatory_docs_dir(settings: Settings) -> Path:
     p = Path(settings.regulatory_docs_path)

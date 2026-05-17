@@ -1,4 +1,5 @@
-const BASE = "";
+/** Set `VITE_API_URL` on Vercel to your Render API origin, e.g. https://aml-api.onrender.com */
+const BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
 export type AlertSummary = {
   id: string;
