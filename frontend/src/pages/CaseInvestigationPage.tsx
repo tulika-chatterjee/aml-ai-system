@@ -1,7 +1,8 @@
-import type { AlertDetail } from "../api";
+import type { AlertDetail, AlertSummary } from "../api";
 import { NetworkGraph } from "../components/NetworkGraph";
 import { isSarFiledStatus } from "../utils/alertStatus";
 import { formatRuleFlags } from "../utils/format";
+import { displaySeverity, isAnalystSeverity, severityCssClass } from "../utils/severity";
 
 function behaviorBlurb(ml: Record<string, unknown>): string {
   const summary = ml.summary ?? ml.narrative ?? ml.anomaly_summary;
@@ -47,6 +48,8 @@ function agentSteps(detail: AlertDetail): { agent: string; message: string }[] {
 }
 
 type Props = {
+  alerts: AlertSummary[];
+  busy: boolean;
   alertId: string | null;
   detail: AlertDetail | null;
   loading: boolean;
@@ -56,12 +59,82 @@ type Props = {
   onNotesChange: (v: string) => void;
   onDecision: (verdict: "fraud" | "safe") => void;
   onFileSar: () => void;
+  onViewCase: (alertId: string) => void;
+  onBackToList: () => void;
+  rulePreview: (a: AlertSummary) => string;
   decisionBusy: boolean;
-  lastDecision: { verdict: "fraud" | "safe"; alertStatus: string; recordedAt: string } | null;
+  lastDecision: {
+    verdict: "fraud" | "safe";
+    alertStatus: string;
+    alertSeverity: string;
+    recordedAt: string;
+  } | null;
   caseOpening: boolean;
 };
 
+function CasesListPanel({
+  alerts,
+  busy,
+  onViewCase,
+  rulePreview,
+}: {
+  alerts: AlertSummary[];
+  busy: boolean;
+  onViewCase: (id: string) => void;
+  rulePreview: (a: AlertSummary) => string;
+}) {
+  return (
+    <section className="panel elevate">
+      <div className="panel-head">
+        <h3>Cases list</h3>
+        <span className="pill">{alerts.length} alerts</span>
+      </div>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Account</th>
+              <th>Risk score</th>
+              <th>Severity</th>
+              <th>Status</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {alerts.map((a) => (
+              <tr key={a.id}>
+                <td className="mono">{a.id.slice(0, 8)}…</td>
+                <td className="mono">{a.account_id}</td>
+                <td>{a.hybrid_score.toFixed(2)}</td>
+                <td>
+                  <span className={`sev ${severityCssClass(a.severity)}`}>{displaySeverity(a.severity)}</span>
+                </td>
+                <td className="muted small">{a.status}</td>
+                <td>
+                  <button type="button" className="btn primary sm" disabled={busy} onClick={() => onViewCase(a.id)}>
+                    Open case
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {alerts.length === 0 && (
+              <tr>
+                <td colSpan={6} className="muted">
+                  No alerts in queue. Run detection or upload CSV data from the Dashboard.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export function CaseInvestigationPage({
+  alerts,
+  busy,
   alertId,
   detail,
   loading,
@@ -71,6 +144,9 @@ export function CaseInvestigationPage({
   onNotesChange,
   onDecision,
   onFileSar,
+  onViewCase,
+  onBackToList,
+  rulePreview,
   decisionBusy,
   lastDecision,
   caseOpening,
@@ -79,12 +155,12 @@ export function CaseInvestigationPage({
     return (
       <div className="page-stack">
         <div className="page-head">
-          <h2 className="page-title">Cases</h2>
-          <p className="page-sub muted">Select View case from Alerts or Dashboard to open an investigation.</p>
+          <div>
+            <h2 className="page-title">Cases</h2>
+            <p className="page-sub muted">Case Management Agent — open an alert to investigate and record analyst decisions.</p>
+          </div>
         </div>
-        <section className="panel elevate empty-case">
-          <p className="muted">No case selected.</p>
-        </section>
+        <CasesListPanel alerts={alerts} busy={busy} onViewCase={onViewCase} rulePreview={rulePreview} />
       </div>
     );
   }
@@ -93,8 +169,13 @@ export function CaseInvestigationPage({
     return (
       <div className="page-stack">
         <div className="page-head">
-          <h2 className="page-title">Case investigation</h2>
-          <p className="case-id mono">Case · {alertId.slice(0, 8)}…</p>
+          <div>
+            <button type="button" className="btn ghost sm case-back" onClick={onBackToList}>
+              ← Back to cases list
+            </button>
+            <h2 className="page-title">Case investigation</h2>
+            <p className="case-id mono">Alert · {alertId.slice(0, 8)}…</p>
+          </div>
         </div>
         <p className="muted">Loading case intelligence…</p>
       </div>
@@ -105,12 +186,15 @@ export function CaseInvestigationPage({
   const caseReady = apiOnline && !!caseId && !caseOpening;
   const canSubmit = caseReady && !decisionBusy && !sarFiled;
   const canFileSar = caseReady && !decisionBusy && !sarFiled;
-  const closedByAnalyst = detail.status === "ANALYST_CONFIRMED_FRAUD" || detail.status === "CLOSED_SAFE";
+  const closedByAnalyst = isAnalystSeverity(detail.severity);
 
   return (
     <div className="page-stack case-page">
       <div className="page-head">
         <div>
+          <button type="button" className="btn ghost sm case-back" onClick={onBackToList}>
+            ← Back to cases list
+          </button>
           <h2 className="page-title">Case investigation</h2>
           <p className="case-id mono">Alert / case ID · {detail.id}</p>
           {caseOpening && <p className="banner warn inline">Opening investigation case on server…</p>}
@@ -133,7 +217,7 @@ export function CaseInvestigationPage({
           <div>
             <p className="label">Severity · status</p>
             <p>
-              <span className={`sev ${detail.severity.toLowerCase()}`}>{detail.severity}</span>
+              <span className={`sev ${severityCssClass(detail.severity)}`}>{displaySeverity(detail.severity)}</span>
               <span className="muted"> · {detail.status}</span>
             </p>
           </div>
@@ -192,8 +276,10 @@ export function CaseInvestigationPage({
         <p className="invest-kicker muted">Feedback loop for learning — updates alert status and audit trail</p>
         {lastDecision && (
           <p className="banner ok inline">
-            Recorded <strong>{lastDecision.verdict === "fraud" ? "fraud confirmed" : "false positive (safe)"}</strong>{" "}
-            · alert status <strong>{lastDecision.alertStatus}</strong>
+            Recorded <strong>{lastDecision.verdict === "fraud" ? "fraud confirmed" : "false positive (safe)"}</strong>
+            {" "}
+            · severity <strong>{displaySeverity(lastDecision.alertSeverity)}</strong> · status{" "}
+            <strong>{lastDecision.alertStatus}</strong>
           </p>
         )}
         {closedByAnalyst && !lastDecision && (

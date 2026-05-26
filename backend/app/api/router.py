@@ -254,12 +254,15 @@ async def human_feedback(body: FeedbackPayload, session: AsyncSession = Depends(
     if verdict == "fraud":
         disposition = "fraud"
         alert_status = "ANALYST_CONFIRMED_FRAUD"
+        alert_severity = "FRAUD"
     elif verdict == "safe":
         disposition = "safe"
         alert_status = "CLOSED_SAFE"
+        alert_severity = "SAFE"
     else:
         disposition = verdict
         alert_status = "UNDER_REVIEW"
+        alert_severity = "MEDIUM"
 
     case.disposition = disposition
     case.investigator_notes = body.comment
@@ -267,6 +270,7 @@ async def human_feedback(body: FeedbackPayload, session: AsyncSession = Depends(
 
     if alert:
         alert.status = alert_status
+        alert.severity = alert_severity
         alert.updated_at = now
 
     fb = HumanFeedbackAudit(
@@ -286,6 +290,7 @@ async def human_feedback(body: FeedbackPayload, session: AsyncSession = Depends(
         "case_id": case.id,
         "alert_id": case.alert_id,
         "alert_status": alert.status if alert else alert_status,
+        "alert_severity": alert.severity if alert else alert_severity,
         "disposition": disposition,
         "verdict": verdict,
     }

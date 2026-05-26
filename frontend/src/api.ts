@@ -81,6 +81,7 @@ export type FeedbackResponse = {
   case_id: string;
   alert_id: string;
   alert_status: string;
+  alert_severity: string;
   disposition: string;
   verdict: string;
 };

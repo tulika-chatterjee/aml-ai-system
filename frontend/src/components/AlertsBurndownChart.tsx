@@ -5,9 +5,12 @@ type Point = { label: string; count: number };
 type DaySeverity = { low: number; medium: number; high: number };
 
 function severityBucket(a: AlertSummary): keyof DaySeverity {
-  const sev = a.severity.toLowerCase();
-  if (sev === "high" || a.hybrid_score >= 0.75) return "high";
-  if (sev === "medium" || a.hybrid_score >= 0.5) return "medium";
+  const sev = a.severity.toUpperCase();
+  if (sev === "FRAUD") return "high";
+  if (sev === "SAFE") return "low";
+  const s = a.severity.toLowerCase();
+  if (s === "high" || a.hybrid_score >= 0.75) return "high";
+  if (s === "medium" || a.hybrid_score >= 0.5) return "medium";
   return "low";
 }
 

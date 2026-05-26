@@ -32,6 +32,7 @@ export function MainApp({ onSignOut }: Props) {
   const [lastDecision, setLastDecision] = useState<{
     verdict: "fraud" | "safe";
     alertStatus: string;
+    alertSeverity: string;
     recordedAt: string;
   } | null>(null);
 
@@ -172,6 +173,7 @@ export function MainApp({ onSignOut }: Props) {
       setLastDecision({
         verdict,
         alertStatus: res.alert_status,
+        alertSeverity: res.alert_severity,
         recordedAt: new Date().toISOString(),
       });
       const d = await api.alert(investigationAlertId);
@@ -235,6 +237,14 @@ export function MainApp({ onSignOut }: Props) {
   const rulePreview = (a: AlertSummary) =>
     `${a.rule_count} rule trigger${a.rule_count === 1 ? "" : "s"}`;
 
+  function handleBackToCasesList() {
+    setInvestigationAlertId(null);
+    setInvestigationDetail(null);
+    setLastDecision(null);
+    setAnalystNotes("");
+    setError(null);
+  }
+
   let content: ReactElement;
   switch (nav) {
     case "dashboard":
@@ -268,6 +278,8 @@ export function MainApp({ onSignOut }: Props) {
     case "cases":
       content = (
         <CaseInvestigationPage
+          alerts={alerts}
+          busy={busy}
           alertId={investigationAlertId}
           detail={investigationDetail}
           loading={investigationLoading}
@@ -277,6 +289,9 @@ export function MainApp({ onSignOut }: Props) {
           onNotesChange={setAnalystNotes}
           onDecision={handleDecision}
           onFileSar={handleFileSar}
+          onViewCase={handleViewCase}
+          onBackToList={handleBackToCasesList}
+          rulePreview={rulePreview}
           decisionBusy={decisionBusy}
           lastDecision={lastDecision}
           caseOpening={apiOnline && !!investigationAlertId && !caseByAlert[investigationAlertId ?? ""]}

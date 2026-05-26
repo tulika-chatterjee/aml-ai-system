@@ -1,4 +1,5 @@
 import type { AlertSummary } from "../api";
+import { displaySeverity, severityCssClass } from "../utils/severity";
 
 type Props = {
   alerts: AlertSummary[];
@@ -44,7 +45,7 @@ export function AlertsPage({ alerts, busy, onViewCase, rulePreview }: Props) {
                   <td>{a.hybrid_score.toFixed(2)}</td>
                   <td className="flags-cell">{rulePreview(a)}</td>
                   <td>
-                    <span className={`sev ${a.severity.toLowerCase()}`}>{a.severity}</span>
+                    <span className={`sev ${severityCssClass(a.severity)}`}>{displaySeverity(a.severity)}</span>
                   </td>
                   <td>
                     <button type="button" className="btn primary sm" disabled={busy} onClick={() => onViewCase(a.id)}>
