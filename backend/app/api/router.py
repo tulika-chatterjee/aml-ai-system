@@ -169,6 +169,45 @@ class CaseCreate(BaseModel):
     assigned_to: str | None = None
 
 
+class FileSarPayload(BaseModel):
+    case_id: str | None = None
+    analyst_id: str = "demo-analyst"
+    comment: str | None = None
+
+
+@router.post("/alerts/{alert_id}/file-sar")
+async def file_sar(
+    alert_id: str,
+    body: FileSarPayload | None = None,
+    session: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Mark alert as SAR/SMR filed (demo workflow — not AUSTRAC submission)."""
+
+    alert = await session.get(GoldAlert, alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    now = datetime.now(timezone.utc)
+    alert.status = "SAR_FILED"
+    alert.updated_at = now
+
+    payload = body or FileSarPayload()
+    if payload.case_id:
+        session.add(
+            HumanFeedbackAudit(
+                id=str(uuid4()),
+                case_id=payload.case_id,
+                analyst_id=payload.analyst_id,
+                verdict="sar_filed",
+                comment=payload.comment,
+                created_at=now,
+            )
+        )
+
+    await session.commit()
+    return {"alert_id": alert.id, "status": alert.status}
+
+
 @router.post("/alerts/{alert_id}/case")
 async def open_case(alert_id: str, body: CaseCreate, session: AsyncSession = Depends(get_db)) -> dict[str, Any]:
     alert = await session.get(GoldAlert, alert_id)

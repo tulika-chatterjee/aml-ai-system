@@ -148,6 +148,31 @@ export function MainApp({ onSignOut }: Props) {
     }
   }
 
+  async function handleFileSar() {
+    if (!investigationAlertId) return;
+    const caseId = caseByAlert[investigationAlertId];
+    if (!caseId) return;
+    setDecisionBusy(true);
+    setError(null);
+    try {
+      await api.fileSar(investigationAlertId, {
+        case_id: caseId,
+        analyst_id: "demo-analyst",
+        comment: analystNotes || null,
+      });
+      const d = await api.alert(investigationAlertId);
+      setInvestigationDetail({
+        ...d,
+        rule_count: Array.isArray(d.rule_triggers) ? d.rule_triggers.length : 0,
+      });
+      await refreshAll();
+    } catch (e) {
+      setError(String((e as Error).message));
+    } finally {
+      setDecisionBusy(false);
+    }
+  }
+
   const totalTransactions = transactionCount;
   const casesOpen = Object.keys(caseByAlert).length;
 
@@ -209,6 +234,7 @@ export function MainApp({ onSignOut }: Props) {
           analystNotes={analystNotes}
           onNotesChange={setAnalystNotes}
           onDecision={handleDecision}
+          onFileSar={handleFileSar}
           decisionBusy={decisionBusy}
         />
       );

@@ -1,4 +1,5 @@
 import type { AlertSummary } from "../api";
+import { isSarFiledStatus } from "../utils/alertStatus";
 
 type Props = {
   alerts: AlertSummary[];
@@ -6,10 +7,7 @@ type Props = {
 };
 
 export function SARsPage({ alerts, onViewCase }: Props) {
-  const sars = alerts.filter((a) => {
-    const status = a.status.toLowerCase();
-    return status.includes("sar") || status.includes("smr") || status.includes("filed");
-  });
+  const sars = alerts.filter((a) => isSarFiledStatus(a.status));
 
   return (
     <div className="page-stack">
@@ -53,7 +51,7 @@ export function SARsPage({ alerts, onViewCase }: Props) {
               {sars.length === 0 && (
                 <tr>
                   <td colSpan={5} className="muted">
-                    No SAR/SMR-filed items found yet. Items appear here when alert status is marked as filed.
+                    No SAR/SMR-filed items yet. Open a case from Alerts → Mark SAR/SMR filed (demo status, not AUSTRAC submission).
                   </td>
                 </tr>
               )}

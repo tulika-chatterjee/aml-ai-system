@@ -880,6 +880,15 @@ td {
   font-size: 13px;
 }
 
+.banner.ok.inline {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #052e16;
+  border: 1px solid #166534;
+  font-size: 13px;
+}
+
 .sev.high {
   color: #fecaca;
 }

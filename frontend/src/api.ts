@@ -98,6 +98,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ assigned_to: assignedTo ?? null }),
     }),
+  fileSar: (
+    alertId: string,
+    body?: { case_id?: string | null; analyst_id?: string; comment?: string | null },
+  ) =>
+    json<{ alert_id: string; status: string }>(`/api/alerts/${alertId}/file-sar`, {
+      method: "POST",
+      body: JSON.stringify(body ?? {}),
+    }),
   feedback: (body: { case_id: string; analyst_id: string; verdict: string; comment?: string | null }) =>
     json<FeedbackResponse>("/api/feedback", {
       method: "POST",

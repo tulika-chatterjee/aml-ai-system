@@ -1,5 +1,6 @@
 import type { AlertDetail } from "../api";
 import { NetworkGraph } from "../components/NetworkGraph";
+import { isSarFiledStatus } from "../utils/alertStatus";
 import { formatRuleFlags } from "../utils/format";
 
 function behaviorBlurb(ml: Record<string, unknown>): string {
@@ -54,6 +55,7 @@ type Props = {
   analystNotes: string;
   onNotesChange: (v: string) => void;
   onDecision: (verdict: "fraud" | "safe") => void;
+  onFileSar: () => void;
   decisionBusy: boolean;
 };
 
@@ -66,6 +68,7 @@ export function CaseInvestigationPage({
   analystNotes,
   onNotesChange,
   onDecision,
+  onFileSar,
   decisionBusy,
 }: Props) {
   if (!alertId) {
@@ -94,7 +97,9 @@ export function CaseInvestigationPage({
     );
   }
 
+  const sarFiled = isSarFiledStatus(detail.status);
   const canSubmit = apiOnline && !!caseId && !decisionBusy;
+  const canFileSar = apiOnline && !!caseId && !decisionBusy && !sarFiled;
 
   return (
     <div className="page-stack case-page">
@@ -155,6 +160,13 @@ export function CaseInvestigationPage({
           {detail.explanation ??
             "No narrative yet. Configure OPENAI_API_KEY in backend `.env` and re-run detection for richer RAG output."}
         </article>
+        {sarFiled ? (
+          <p className="banner ok inline">This alert is marked <strong>SAR/SMR filed</strong> — it appears on the SARs tab.</p>
+        ) : (
+          <p className="muted small">
+            Review the narrative, then file from Human-in-the-loop below when suspicion is confirmed (demo status only).
+          </p>
+        )}
       </section>
 
       <section className="invest-block">
@@ -168,10 +180,13 @@ export function CaseInvestigationPage({
         <h3 className="invest-heading">Human-in-the-loop Agent</h3>
         <p className="invest-kicker muted">Feedback loop for learning</p>
         <div className="analyst-actions">
-          <button type="button" className="btn danger" disabled={!canSubmit} onClick={() => onDecision("fraud")}>
+          <button type="button" className="btn primary" disabled={!canFileSar} onClick={onFileSar}>
+            Mark SAR/SMR filed
+          </button>
+          <button type="button" className="btn danger" disabled={!canSubmit || sarFiled} onClick={() => onDecision("fraud")}>
             Approve fraud
           </button>
-          <button type="button" className="btn success" disabled={!canSubmit} onClick={() => onDecision("safe")}>
+          <button type="button" className="btn success" disabled={!canSubmit || sarFiled} onClick={() => onDecision("safe")}>
             Mark as safe
           </button>
         </div>
