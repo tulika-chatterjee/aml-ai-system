@@ -5,3 +5,6 @@ frontend/dist/
 *.pyc
 .env
 .DS_Store
+
+# Sample data CSVs stay local (schemas documented in data/synthetic/README.md)
+*.csv

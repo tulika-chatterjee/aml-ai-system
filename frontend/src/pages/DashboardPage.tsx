@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import type { AlertSummary } from "../api";
+import { api, type AlertSummary } from "../api";
 import { AlertsBurndownChart } from "../components/AlertsBurndownChart";
 import { ComplianceAgentChat } from "../components/ComplianceAgentChat";
 import { RiskDistributionChart } from "../components/RiskDistributionChart";
+import { SAMPLE_CUSTOMERS_CSV, SAMPLE_TRANSACTIONS_CSV } from "../demo/bundledSampleCsv";
 import { alertsSeriesLastDays } from "../utils/format";
 
 type Props = {
@@ -11,6 +12,8 @@ type Props = {
   casesOpen: number;
   onOpenAlert: (id: string) => void;
   onGoAlerts: () => void;
+  onAfterUpload: () => Promise<void>;
+  apiOnline: boolean;
 };
 
 function customerNameFromId(customerId: string): string {
@@ -19,9 +22,19 @@ function customerNameFromId(customerId: string): string {
   return `Synthetic Person ${Number(match[1])}`;
 }
 
-export function DashboardPage({ alerts, totalTransactions, casesOpen: _casesOpen, onOpenAlert, onGoAlerts }: Props) {
+export function DashboardPage({
+  alerts,
+  totalTransactions,
+  casesOpen: _casesOpen,
+  onOpenAlert,
+  onGoAlerts,
+  onAfterUpload,
+  apiOnline,
+}: Props) {
   const [customerCsv, setCustomerCsv] = useState<File | null>(null);
   const [transactionCsv, setTransactionCsv] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const sarFiled = alerts.filter((a) => {
     const s = a.status.toLowerCase();
     return s.includes("sar") || s.includes("smr") || s.includes("filed");
@@ -76,6 +89,59 @@ export function DashboardPage({ alerts, totalTransactions, casesOpen: _casesOpen
       return b.maxRisk - a.maxRisk;
     });
   })();
+
+  async function pushCsvToBackend(customerFile: File, transactionFile: File) {
+    const parts: string[] = [];
+    const custRes = await api.uploadCustomersCsv(customerFile);
+    parts.push(`${custRes.ingested_kyc} customer(s)`);
+    const txnRes = await api.uploadTransactionsCsv(transactionFile);
+    parts.push(`${txnRes.ingested_transactions} transaction(s)`);
+    await onAfterUpload();
+    parts.push("alerts refreshed");
+    return parts.join(" · ");
+  }
+
+  async function handleUploadSelected() {
+    if (!customerCsv || !transactionCsv) {
+      setUploadStatus("Select both customer and transaction CSV files.");
+      return;
+    }
+    if (!apiOnline) {
+      setUploadStatus("API offline — cannot upload.");
+      return;
+    }
+    setUploading(true);
+    setUploadStatus("Uploading to backend…");
+    try {
+      const msg = await pushCsvToBackend(customerCsv, transactionCsv);
+      setUploadStatus(`Done — ${msg}`);
+    } catch (e) {
+      setUploadStatus(String((e as Error).message));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleUploadSampleData() {
+    if (!apiOnline) {
+      setUploadStatus("API offline — cannot upload.");
+      return;
+    }
+    setUploading(true);
+    setUploadStatus("Loading sample data and pushing to backend…");
+    try {
+      const customerFile = new File([SAMPLE_CUSTOMERS_CSV], "sample_customers.csv", { type: "text/csv" });
+      const transactionFile = new File([SAMPLE_TRANSACTIONS_CSV], "sample_transactions.csv", { type: "text/csv" });
+      setCustomerCsv(customerFile);
+      setTransactionCsv(transactionFile);
+      const msg = await pushCsvToBackend(customerFile, transactionFile);
+      setUploadStatus(`Done — ${msg}`);
+    } catch (e) {
+      setUploadStatus(String((e as Error).message));
+    } finally {
+      setUploading(false);
+    }
+  }
 
   const complianceContext = useMemo(
     () => ({
@@ -144,9 +210,19 @@ export function DashboardPage({ alerts, totalTransactions, casesOpen: _casesOpen
       </section>
 
       <section className="panel elevate">
-        <div className="panel-head">
-          <h3>Upload Data</h3>
-          <span className="pill ghost">CSV only</span>
+        <div className="panel-head panel-head-chart">
+          <div className="panel-head-left">
+            <h3>Upload Data</h3>
+            <span className="pill ghost">CSV → backend bronze layer</span>
+          </div>
+          <button
+            type="button"
+            className="btn primary sm"
+            disabled={uploading || !apiOnline}
+            onClick={handleUploadSampleData}
+          >
+            {uploading ? "Uploading…" : "Upload sample CSVs & refresh alerts"}
+          </button>
         </div>
         <div className="upload-grid">
           <label className="field">
@@ -168,9 +244,25 @@ export function DashboardPage({ alerts, totalTransactions, casesOpen: _casesOpen
             <span className="muted small">{transactionCsv ? transactionCsv.name : "No file selected"}</span>
           </label>
         </div>
+        <div className="upload-actions">
+          <button
+            type="button"
+            className="btn primary sm"
+            disabled={uploading || !apiOnline || !customerCsv || !transactionCsv}
+            onClick={handleUploadSelected}
+          >
+            {uploading ? "Uploading…" : "Upload selected CSVs & refresh alerts"}
+          </button>
+        </div>
         <p className="muted small">
-          Upload UI is ready. Hook these files to backend ingestion endpoints when your CSV schema is finalized.
+          Pushes customer + transaction rows to the API, runs detection, and updates dashboards and the alerts
+          queue. Or use the sample button above (no file picker needed).
         </p>
+        {uploadStatus && (
+          <p className={`upload-status small${uploadStatus.startsWith("Done") ? " upload-status-ok" : ""}`}>
+            {uploadStatus}
+          </p>
+        )}
       </section>
 
       <section className="panel elevate">

@@ -3,7 +3,7 @@ from typing import Any
 from uuid import uuid4
 
 from agents.ingestion import ingest_kyc_batch, ingest_transactions
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,7 @@ from app.db.seed_demo import ensure_demo_alerts
 from app.db.session import get_db
 from app.mcp.manifest import describe_manifest
 from app.services.compliance_chat import synthesize_compliance_reply
+from app.services.csv_ingest import parse_customers_csv, parse_transactions_csv
 from app.services.scoring_pipeline import run_detection_cycle
 from app.simulator.generator import generate_demo_customers, generate_demo_dataset
 
@@ -42,6 +43,38 @@ async def simulate(payload: SimulatePayload, session: AsyncSession = Depends(get
     kyc_ids = await ingest_kyc_batch(session, cust_rows)
     txn_ids = await ingest_transactions(session, txn_rows)
     return {"ingested_kyc": len(kyc_ids), "ingested_transactions": len(txn_ids)}
+
+
+@router.post("/upload/customers")
+async def upload_customers_csv(
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Upload a .csv file")
+    raw = await file.read()
+    try:
+        rows = parse_customers_csv(raw)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    ids = await ingest_kyc_batch(session, rows)
+    return {"ingested_kyc": len(ids), "customer_ids": [r["customer_id"] for r in rows]}
+
+
+@router.post("/upload/transactions")
+async def upload_transactions_csv(
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Upload a .csv file")
+    raw = await file.read()
+    try:
+        rows = parse_transactions_csv(raw)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    ids = await ingest_transactions(session, rows)
+    return {"ingested_transactions": len(ids)}
 
 
 @router.post("/customers/seed")

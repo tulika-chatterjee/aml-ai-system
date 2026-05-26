@@ -166,6 +166,8 @@ export function MainApp({ onSignOut }: Props) {
           casesOpen={casesOpen}
           onOpenAlert={handleViewCase}
           onGoAlerts={() => setNav("alerts")}
+          onAfterUpload={runDetect}
+          apiOnline={apiOnline}
         />
       );
       break;

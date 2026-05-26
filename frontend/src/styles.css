@@ -702,6 +702,22 @@ code.inline-code {
   margin-bottom: 10px;
 }
 
+.upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.upload-status {
+  margin: 8px 0 0;
+  color: #94a3b8;
+}
+
+.upload-status-ok {
+  color: #6ee7b7;
+}
+
 
 .risk-dist {
   display: flex;

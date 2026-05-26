@@ -44,6 +44,20 @@ async function parseJson<T>(res: Response): Promise<T> {
   }
 }
 
+async function uploadCsv<T>(path: string, file: File): Promise<T> {
+  const body = new FormData();
+  body.append("file", file);
+  const res = await fetch(`${apiBase}${path}`, { method: "POST", body });
+  if (!res.ok) {
+    const text = await res.text();
+    if (text.trimStart().startsWith("<!")) {
+      throw new Error(apiConfigHint());
+    }
+    throw new Error(`${res.status} ${text.slice(0, 200)}`);
+  }
+  return parseJson<T>(res);
+}
+
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${apiBase}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -71,6 +85,10 @@ export type ComplianceChatResponse = {
 export const api = {
   health: () => json<{ status: string }>("/api/health"),
   detect: () => json<{ alerts_created: number; alert_ids: string[] }>("/api/detect", { method: "POST" }),
+  uploadCustomersCsv: (file: File) =>
+    uploadCsv<{ ingested_kyc: number; customer_ids: string[] }>("/api/upload/customers", file),
+  uploadTransactionsCsv: (file: File) =>
+    uploadCsv<{ ingested_transactions: number }>("/api/upload/transactions", file),
   alerts: () => json<AlertSummary[]>("/api/alerts"),
   alert: (id: string) => json<AlertDetail>(`/api/alerts/${id}`),
   openCase: (alertId: string, assignedTo?: string | null) =>
