@@ -75,7 +75,15 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 
 export type CaseOpenResponse = { case_id: string };
 
-export type FeedbackResponse = { status: string; feedback_id: string };
+export type FeedbackResponse = {
+  status: string;
+  feedback_id: string;
+  case_id: string;
+  alert_id: string;
+  alert_status: string;
+  disposition: string;
+  verdict: string;
+};
 
 export type ComplianceChatResponse = {
   reply: string;

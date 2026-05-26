@@ -213,6 +213,16 @@ async def open_case(alert_id: str, body: CaseCreate, session: AsyncSession = Dep
     alert = await session.get(GoldAlert, alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
+
+    existing = await session.scalar(
+        select(GoldCase)
+        .where(GoldCase.alert_id == alert.id, GoldCase.closed_at.is_(None))
+        .order_by(GoldCase.opened_at.desc())
+        .limit(1)
+    )
+    if existing:
+        return {"case_id": existing.id, "reused": True}
+
     case = GoldCase(
         id=str(uuid4()),
         alert_id=alert.id,
@@ -221,7 +231,7 @@ async def open_case(alert_id: str, body: CaseCreate, session: AsyncSession = Dep
     )
     session.add(case)
     await session.commit()
-    return {"case_id": case.id}
+    return {"case_id": case.id, "reused": False}
 
 
 class FeedbackPayload(BaseModel):
@@ -232,18 +242,53 @@ class FeedbackPayload(BaseModel):
 
 
 @router.post("/feedback")
-async def human_feedback(body: FeedbackPayload, session: AsyncSession = Depends(get_db)) -> dict[str, str]:
+async def human_feedback(body: FeedbackPayload, session: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    case = await session.get(GoldCase, body.case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found — open the case again from Alerts")
+
+    alert = await session.get(GoldAlert, case.alert_id)
+    now = datetime.now(timezone.utc)
+
+    verdict = body.verdict.strip().lower()
+    if verdict == "fraud":
+        disposition = "fraud"
+        alert_status = "ANALYST_CONFIRMED_FRAUD"
+    elif verdict == "safe":
+        disposition = "safe"
+        alert_status = "CLOSED_SAFE"
+    else:
+        disposition = verdict
+        alert_status = "UNDER_REVIEW"
+
+    case.disposition = disposition
+    case.investigator_notes = body.comment
+    case.closed_at = now
+
+    if alert:
+        alert.status = alert_status
+        alert.updated_at = now
+
     fb = HumanFeedbackAudit(
         id=str(uuid4()),
         case_id=body.case_id,
         analyst_id=body.analyst_id,
-        verdict=body.verdict,
+        verdict=verdict,
         comment=body.comment,
-        created_at=datetime.now(timezone.utc),
+        created_at=now,
     )
     session.add(fb)
     await session.commit()
-    return {"status": "recorded", "feedback_id": fb.id}
+
+    return {
+        "status": "recorded",
+        "feedback_id": fb.id,
+        "case_id": case.id,
+        "alert_id": case.alert_id,
+        "alert_status": alert.status if alert else alert_status,
+        "disposition": disposition,
+        "verdict": verdict,
+    }
 
 
 class ComplianceChatPayload(BaseModel):

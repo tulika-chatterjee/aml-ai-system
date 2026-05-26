@@ -29,6 +29,11 @@ export function MainApp({ onSignOut }: Props) {
 
   const [analystNotes, setAnalystNotes] = useState("");
   const [decisionBusy, setDecisionBusy] = useState(false);
+  const [lastDecision, setLastDecision] = useState<{
+    verdict: "fraud" | "safe";
+    alertStatus: string;
+    recordedAt: string;
+  } | null>(null);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,33 +117,67 @@ export function MainApp({ onSignOut }: Props) {
     }
   }
 
+  const ensureCaseForAlert = useCallback(
+    async (alertId: string): Promise<string> => {
+      const cached = caseByAlert[alertId];
+      if (cached) return cached;
+      const { case_id } = await api.openCase(alertId);
+      setCaseByAlert((m) => ({ ...m, [alertId]: case_id }));
+      return case_id;
+    },
+    [caseByAlert],
+  );
+
+  useEffect(() => {
+    if (!investigationAlertId || !apiOnline) return;
+    let cancelled = false;
+    ensureCaseForAlert(investigationAlertId).catch((e) => {
+      if (!cancelled) setError(String((e as Error).message));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [investigationAlertId, apiOnline, ensureCaseForAlert]);
+
   async function handleViewCase(alertId: string) {
     setError(null);
     setAnalystNotes("");
+    setLastDecision(null);
+    setInvestigationAlertId(alertId);
+    setNav("cases");
+    if (!apiOnline) return;
     try {
-      if (apiOnline) {
-        const { case_id } = await api.openCase(alertId);
-        setCaseByAlert((m) => ({ ...m, [alertId]: case_id }));
-      }
+      await ensureCaseForAlert(alertId);
     } catch (e) {
       setError(String((e as Error).message));
     }
-    setInvestigationAlertId(alertId);
-    setNav("cases");
   }
 
   async function handleDecision(verdict: "fraud" | "safe") {
     if (!investigationAlertId) return;
-    const caseId = caseByAlert[investigationAlertId];
-    if (!caseId) return;
+    if (!apiOnline) {
+      setError("API offline — cannot record analyst decision.");
+      return;
+    }
     setDecisionBusy(true);
     setError(null);
     try {
-      await api.feedback({
+      const caseId = await ensureCaseForAlert(investigationAlertId);
+      const res = await api.feedback({
         case_id: caseId,
         analyst_id: "demo-analyst",
         verdict,
         comment: analystNotes || null,
+      });
+      setLastDecision({
+        verdict,
+        alertStatus: res.alert_status,
+        recordedAt: new Date().toISOString(),
+      });
+      const d = await api.alert(investigationAlertId);
+      setInvestigationDetail({
+        ...d,
+        rule_count: Array.isArray(d.rule_triggers) ? d.rule_triggers.length : d.rule_count ?? 0,
       });
       await refreshAll();
     } catch (e) {
@@ -150,11 +189,14 @@ export function MainApp({ onSignOut }: Props) {
 
   async function handleFileSar() {
     if (!investigationAlertId) return;
-    const caseId = caseByAlert[investigationAlertId];
-    if (!caseId) return;
+    if (!apiOnline) {
+      setError("API offline — cannot file SAR.");
+      return;
+    }
     setDecisionBusy(true);
     setError(null);
     try {
+      const caseId = await ensureCaseForAlert(investigationAlertId);
       await api.fileSar(investigationAlertId, {
         case_id: caseId,
         analyst_id: "demo-analyst",
@@ -236,6 +278,8 @@ export function MainApp({ onSignOut }: Props) {
           onDecision={handleDecision}
           onFileSar={handleFileSar}
           decisionBusy={decisionBusy}
+          lastDecision={lastDecision}
+          caseOpening={apiOnline && !!investigationAlertId && !caseByAlert[investigationAlertId ?? ""]}
         />
       );
       break;

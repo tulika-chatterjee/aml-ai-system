@@ -57,6 +57,8 @@ type Props = {
   onDecision: (verdict: "fraud" | "safe") => void;
   onFileSar: () => void;
   decisionBusy: boolean;
+  lastDecision: { verdict: "fraud" | "safe"; alertStatus: string; recordedAt: string } | null;
+  caseOpening: boolean;
 };
 
 export function CaseInvestigationPage({
@@ -70,6 +72,8 @@ export function CaseInvestigationPage({
   onDecision,
   onFileSar,
   decisionBusy,
+  lastDecision,
+  caseOpening,
 }: Props) {
   if (!alertId) {
     return (
@@ -98,8 +102,10 @@ export function CaseInvestigationPage({
   }
 
   const sarFiled = isSarFiledStatus(detail.status);
-  const canSubmit = apiOnline && !!caseId && !decisionBusy;
-  const canFileSar = apiOnline && !!caseId && !decisionBusy && !sarFiled;
+  const caseReady = apiOnline && !!caseId && !caseOpening;
+  const canSubmit = caseReady && !decisionBusy && !sarFiled;
+  const canFileSar = caseReady && !decisionBusy && !sarFiled;
+  const closedByAnalyst = detail.status === "ANALYST_CONFIRMED_FRAUD" || detail.status === "CLOSED_SAFE";
 
   return (
     <div className="page-stack case-page">
@@ -107,7 +113,12 @@ export function CaseInvestigationPage({
         <div>
           <h2 className="page-title">Case investigation</h2>
           <p className="case-id mono">Alert / case ID · {detail.id}</p>
-          {!caseId && <p className="banner warn inline">API offline or case not opened — decisions require a server-backed case.</p>}
+          {caseOpening && <p className="banner warn inline">Opening investigation case on server…</p>}
+          {!apiOnline && <p className="banner warn inline">API offline — connect backend to record decisions.</p>}
+          {apiOnline && !caseOpening && !caseId && (
+            <p className="banner warn inline">Case could not be opened — refresh or open again from Alerts.</p>
+          )}
+          {caseId && <p className="muted small mono">Case ID · {caseId.slice(0, 8)}…</p>}
         </div>
       </div>
 
@@ -178,18 +189,42 @@ export function CaseInvestigationPage({
 
       <section className="invest-block analyst">
         <h3 className="invest-heading">Human-in-the-loop Agent</h3>
-        <p className="invest-kicker muted">Feedback loop for learning</p>
+        <p className="invest-kicker muted">Feedback loop for learning — updates alert status and audit trail</p>
+        {lastDecision && (
+          <p className="banner ok inline">
+            Recorded <strong>{lastDecision.verdict === "fraud" ? "fraud confirmed" : "false positive (safe)"}</strong>{" "}
+            · alert status <strong>{lastDecision.alertStatus}</strong>
+          </p>
+        )}
+        {closedByAnalyst && !lastDecision && (
+          <p className="banner ok inline">
+            Analyst decision on file · status <strong>{detail.status}</strong>
+          </p>
+        )}
         <div className="analyst-actions">
           <button type="button" className="btn primary" disabled={!canFileSar} onClick={onFileSar}>
             Mark SAR/SMR filed
           </button>
-          <button type="button" className="btn danger" disabled={!canSubmit || sarFiled} onClick={() => onDecision("fraud")}>
-            Approve fraud
+          <button
+            type="button"
+            className="btn danger"
+            disabled={!canSubmit || closedByAnalyst}
+            onClick={() => onDecision("fraud")}
+          >
+            {decisionBusy ? "Saving…" : "Approve fraud"}
           </button>
-          <button type="button" className="btn success" disabled={!canSubmit || sarFiled} onClick={() => onDecision("safe")}>
-            Mark as safe
+          <button
+            type="button"
+            className="btn success"
+            disabled={!canSubmit || closedByAnalyst}
+            onClick={() => onDecision("safe")}
+          >
+            {decisionBusy ? "Saving…" : "Mark as safe"}
           </button>
         </div>
+        {closedByAnalyst && (
+          <p className="muted small">This alert is closed from an analyst decision. Run detection to reset the queue.</p>
+        )}
         <label className="field block">
           <span className="field-label">Notes</span>
           <textarea
