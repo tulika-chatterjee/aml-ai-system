@@ -235,8 +235,15 @@ export function CaseInvestigationPage({
           </div>
           <div className="wide">
             <p className="label">Network profile context</p>
-            <NetworkGraph variant="case" />
-            <pre className="invest-pre">{JSON.stringify(detail.graph_signals, null, 2)}</pre>
+            <NetworkGraph
+              variant="case"
+              graphSignals={detail.graph_signals}
+              focusAccountId={detail.account_id}
+            />
+            <details className="graph-signals-raw">
+              <summary className="muted small">Raw graph signals (JSON)</summary>
+              <pre className="invest-pre">{JSON.stringify(detail.graph_signals, null, 2)}</pre>
+            </details>
           </div>
         </div>
       </section>

@@ -1117,6 +1117,21 @@ td {
   font-size: 12px;
 }
 
+.graph-panel.graph-empty {
+  padding: 16px;
+  border: 1px dashed #334155;
+  border-radius: 8px;
+  background: #0f172a;
+}
+
+.graph-signals-raw {
+  margin-top: 10px;
+}
+
+.graph-signals-raw summary {
+  cursor: pointer;
+}
+
 /* Markdown / narrative */
 .markdown {
   white-space: pre-wrap;

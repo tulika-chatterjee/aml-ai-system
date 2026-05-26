@@ -119,10 +119,12 @@ async def run_detection_cycle(
             "features": dict(zip(ml_res.feature_names, ml_res.feature_vector)),
         }
         graph_payload = {
+            "focus_account": r.account_id,
             "cluster_size": g_insight.cluster_size,
             "suspicious_edge_ratio": g_insight.suspicious_edge_ratio,
             "source": g_insight.source,
-            "sample_edges": [{"from": a, "to": b, **c} for a, b, c in g_insight.edges[:12]],
+            "node_count": len(g_insight.nodes),
+            "sample_edges": [{"from": a, "to": b, **c} for a, b, c in g_insight.edges[:16]],
         }
 
         rule_ids = [h.rule_id for h in rule_hits]

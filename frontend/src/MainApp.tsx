@@ -19,6 +19,7 @@ type Props = {
 export function MainApp({ onSignOut }: Props) {
   const [nav, setNav] = useState<NavKey>("dashboard");
   const [status, setStatus] = useState("");
+  const [refreshNote, setRefreshNote] = useState<string | null>(null);
   const [apiOnline, setApiOnline] = useState(false);
   const [alerts, setAlerts] = useState<AlertSummary[]>([]);
 
@@ -106,13 +107,50 @@ export function MainApp({ onSignOut }: Props) {
   async function runDetect() {
     setBusy(true);
     setError(null);
+    setRefreshNote(null);
     try {
       const result = await api.detect();
+      setCaseByAlert({});
       await refreshAll();
+      if (investigationAlertId) {
+        setInvestigationAlertId(null);
+        setInvestigationDetail(null);
+      }
+      setRefreshNote(`Detection complete — ${result.alerts_created} alert(s) created (previous queue replaced).`);
       return result;
     } catch (e) {
       setError(String((e as Error).message));
       throw e;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRefreshAlerts() {
+    if (!apiOnline) {
+      setError("API offline — cannot refresh.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setRefreshNote(null);
+    try {
+      const [rows] = await Promise.all([api.alerts(), api.stats().then((s) => {
+        setTransactionCount(s.transaction_count);
+        setCustomerCount(s.customer_count);
+        return s;
+      })]);
+      setAlerts(rows);
+      if (investigationAlertId) {
+        const d = await api.alert(investigationAlertId);
+        setInvestigationDetail({
+          ...d,
+          rule_count: Array.isArray(d.rule_triggers) ? d.rule_triggers.length : d.rule_count ?? 0,
+        });
+      }
+      setRefreshNote(`Refreshed — ${rows.length} alert(s) from database (no rescoring).`);
+    } catch (e) {
+      setError(String((e as Error).message));
     } finally {
       setBusy(false);
     }
@@ -225,8 +263,8 @@ export function MainApp({ onSignOut }: Props) {
       <button type="button" className="btn primary sm" disabled={busy} onClick={runDetect}>
         Run detection cycle
       </button>
-      <button type="button" className="btn sm" disabled={busy} onClick={() => refresh().catch((e) => setError(String((e as Error).message)))}>
-        Refresh alerts
+      <button type="button" className="btn sm" disabled={busy} onClick={handleRefreshAlerts}>
+        {busy ? "Working…" : "Refresh alerts"}
       </button>
       <button type="button" className="btn ghost sm" onClick={onSignOut}>
         Sign out
@@ -315,6 +353,7 @@ export function MainApp({ onSignOut }: Props) {
   return (
     <AppShell active={nav} onNav={setNav} apiLine={status} toolbar={toolbar}>
       {error && <div className="banner error page-banner">{error}</div>}
+      {refreshNote && !error && <div className="banner ok inline page-banner">{refreshNote}</div>}
       {content}
     </AppShell>
   );
