@@ -12,8 +12,6 @@ import { PipelinePage } from "./pages/PipelinePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { CompliancePage } from "./pages/CompliancePage";
 
-const DEMO_TX_BASELINE = 12340;
-
 type Props = {
   onSignOut: () => void;
 };
@@ -34,12 +32,24 @@ export function MainApp({ onSignOut }: Props) {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [transactionCount, setTransactionCount] = useState(0);
+  const [customerCount, setCustomerCount] = useState(0);
 
   const refresh = useCallback(async () => {
     setError(null);
     const rows = await api.alerts();
     setAlerts(rows);
   }, []);
+
+  const refreshStats = useCallback(async () => {
+    const s = await api.stats();
+    setTransactionCount(s.transaction_count);
+    setCustomerCount(s.customer_count);
+  }, []);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([refresh(), refreshStats()]);
+  }, [refresh, refreshStats]);
 
   useEffect(() => {
     api
@@ -57,8 +67,8 @@ export function MainApp({ onSignOut }: Props) {
         );
         setApiOnline(false);
       });
-    refresh().catch((e) => setError(String((e as Error).message)));
-  }, [refresh]);
+    refreshAll().catch((e) => setError(String((e as Error).message)));
+  }, [refreshAll]);
 
   useEffect(() => {
     if (!investigationAlertId) {
@@ -91,10 +101,12 @@ export function MainApp({ onSignOut }: Props) {
     setBusy(true);
     setError(null);
     try {
-      await api.detect();
-      await refresh();
+      const result = await api.detect();
+      await refreshAll();
+      return result;
     } catch (e) {
       setError(String((e as Error).message));
+      throw e;
     } finally {
       setBusy(false);
     }
@@ -128,7 +140,7 @@ export function MainApp({ onSignOut }: Props) {
         verdict,
         comment: analystNotes || null,
       });
-      await refresh();
+      await refreshAll();
     } catch (e) {
       setError(String((e as Error).message));
     } finally {
@@ -136,7 +148,7 @@ export function MainApp({ onSignOut }: Props) {
     }
   }
 
-  const totalTransactions = DEMO_TX_BASELINE;
+  const totalTransactions = transactionCount;
   const casesOpen = Object.keys(caseByAlert).length;
 
   const toolbar = (
@@ -168,6 +180,7 @@ export function MainApp({ onSignOut }: Props) {
           onGoAlerts={() => setNav("alerts")}
           onAfterUpload={runDetect}
           apiOnline={apiOnline}
+          customerCount={customerCount}
         />
       );
       break;

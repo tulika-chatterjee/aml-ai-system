@@ -84,6 +84,8 @@ export type ComplianceChatResponse = {
 
 export const api = {
   health: () => json<{ status: string }>("/api/health"),
+  stats: () =>
+    json<{ transaction_count: number; customer_count: number; alert_count: number }>("/api/stats"),
   detect: () => json<{ alerts_created: number; alert_ids: string[] }>("/api/detect", { method: "POST" }),
   uploadCustomersCsv: (file: File) =>
     uploadCsv<{ ingested_kyc: number; customer_ids: string[] }>("/api/upload/customers", file),

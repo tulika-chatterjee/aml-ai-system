@@ -12,8 +12,9 @@ type Props = {
   casesOpen: number;
   onOpenAlert: (id: string) => void;
   onGoAlerts: () => void;
-  onAfterUpload: () => Promise<void>;
+  onAfterUpload: () => Promise<{ alerts_created: number; alert_ids: string[] }>;
   apiOnline: boolean;
+  customerCount: number;
 };
 
 function customerNameFromId(customerId: string): string {
@@ -30,6 +31,7 @@ export function DashboardPage({
   onGoAlerts,
   onAfterUpload,
   apiOnline,
+  customerCount,
 }: Props) {
   const [customerCsv, setCustomerCsv] = useState<File | null>(null);
   const [transactionCsv, setTransactionCsv] = useState<File | null>(null);
@@ -90,20 +92,9 @@ export function DashboardPage({
     });
   })();
 
-  async function pushCsvToBackend(customerFile: File, transactionFile: File) {
-    const parts: string[] = [];
-    const custRes = await api.uploadCustomersCsv(customerFile);
-    parts.push(`${custRes.ingested_kyc} customer(s)`);
-    const txnRes = await api.uploadTransactionsCsv(transactionFile);
-    parts.push(`${txnRes.ingested_transactions} transaction(s)`);
-    await onAfterUpload();
-    parts.push("alerts refreshed");
-    return parts.join(" · ");
-  }
-
   async function handleUploadSelected() {
-    if (!customerCsv || !transactionCsv) {
-      setUploadStatus("Select both customer and transaction CSV files.");
+    if (!customerCsv && !transactionCsv) {
+      setUploadStatus("Select at least one CSV file (customer and/or transactions).");
       return;
     }
     if (!apiOnline) {
@@ -113,13 +104,28 @@ export function DashboardPage({
     setUploading(true);
     setUploadStatus("Uploading to backend…");
     try {
-      const msg = await pushCsvToBackend(customerCsv, transactionCsv);
+      const msg = await pushCsvToBackendPartial(customerCsv, transactionCsv);
       setUploadStatus(`Done — ${msg}`);
     } catch (e) {
       setUploadStatus(String((e as Error).message));
     } finally {
       setUploading(false);
     }
+  }
+
+  async function pushCsvToBackendPartial(customerFile: File | null, transactionFile: File | null) {
+    const parts: string[] = [];
+    if (customerFile) {
+      const custRes = await api.uploadCustomersCsv(customerFile);
+      parts.push(`${custRes.ingested_kyc} customer(s)`);
+    }
+    if (transactionFile) {
+      const txnRes = await api.uploadTransactionsCsv(transactionFile);
+      parts.push(`${txnRes.ingested_transactions} transaction(s)`);
+    }
+    const detect = await onAfterUpload();
+    parts.push(`${detect.alerts_created} alert(s) created`);
+    return parts.join(" · ");
   }
 
   async function handleUploadSampleData() {
@@ -134,7 +140,7 @@ export function DashboardPage({
       const transactionFile = new File([SAMPLE_TRANSACTIONS_CSV], "sample_transactions.csv", { type: "text/csv" });
       setCustomerCsv(customerFile);
       setTransactionCsv(transactionFile);
-      const msg = await pushCsvToBackend(customerFile, transactionFile);
+      const msg = await pushCsvToBackendPartial(customerFile, transactionFile);
       setUploadStatus(`Done — ${msg}`);
     } catch (e) {
       setUploadStatus(String((e as Error).message));
@@ -171,7 +177,7 @@ export function DashboardPage({
         <div className="kpi-card blue">
           <p className="kpi-label">Total transactions</p>
           <p className="kpi-value">{totalTransactions.toLocaleString()}</p>
-          <p className="kpi-hint muted">Demo baseline (bronze ingest runs on API startup)</p>
+          <p className="kpi-hint muted">Bronze transaction rows in database (updates after CSV upload)</p>
         </div>
         <div className="kpi-card orange">
           <p className="kpi-label">Monitored transactions</p>
@@ -182,6 +188,11 @@ export function DashboardPage({
           <p className="kpi-label">Alerts</p>
           <p className="kpi-value">{alerts.length}</p>
           <p className="kpi-hint muted">Current queue</p>
+        </div>
+        <div className="kpi-card">
+          <p className="kpi-label">Customers (KYC)</p>
+          <p className="kpi-value">{customerCount.toLocaleString()}</p>
+          <p className="kpi-hint muted">Bronze customer records</p>
         </div>
         <div className="kpi-card green">
           <p className="kpi-label">SAR filed</p>
@@ -248,7 +259,7 @@ export function DashboardPage({
           <button
             type="button"
             className="btn primary sm"
-            disabled={uploading || !apiOnline || !customerCsv || !transactionCsv}
+            disabled={uploading || !apiOnline || (!customerCsv && !transactionCsv)}
             onClick={handleUploadSelected}
           >
             {uploading ? "Uploading…" : "Upload selected CSVs & refresh alerts"}

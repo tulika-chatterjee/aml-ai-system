@@ -5,10 +5,10 @@ from uuid import uuid4
 from agents.ingestion import ingest_kyc_batch, ingest_transactions
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import BronzeCustomerKyc, GoldAlert, GoldCase, HumanFeedbackAudit
+from app.db.models import BronzeCustomerKyc, BronzeTransaction, GoldAlert, GoldCase, HumanFeedbackAudit
 from app.db.seed_demo import ensure_demo_alerts
 from app.db.session import get_db
 from app.mcp.manifest import describe_manifest
@@ -102,6 +102,18 @@ async def list_customers(session: AsyncSession = Depends(get_db)) -> list[dict[s
         }
         for c in rows
     ]
+
+
+@router.get("/stats")
+async def dashboard_stats(session: AsyncSession = Depends(get_db)) -> dict[str, int]:
+    tx_count = await session.scalar(select(func.count()).select_from(BronzeTransaction)) or 0
+    cust_count = await session.scalar(select(func.count()).select_from(BronzeCustomerKyc)) or 0
+    alert_count = await session.scalar(select(func.count()).select_from(GoldAlert)) or 0
+    return {
+        "transaction_count": int(tx_count),
+        "customer_count": int(cust_count),
+        "alert_count": int(alert_count),
+    }
 
 
 @router.post("/detect")

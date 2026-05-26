@@ -10,7 +10,7 @@ from agents.ingestion import fetch_recent_transactions
 from agents.llm_investigator import synthesize_case_summary
 from models.anomaly import BehavioralAnomalyModel, build_feature_row
 from models.rule_engine import evaluate_graph, evaluate_kyc, evaluate_velocity
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -30,13 +30,15 @@ async def _customer_for_account(session: AsyncSession, account_id: str) -> Bronz
 async def run_detection_cycle(
     session: AsyncSession,
     *,
-    accounts_limit: int = 30,
+    accounts_limit: int = 150,
 ) -> list[GoldAlert]:
     from app.services.feature_compute import rebuild_silver_features
 
     await rebuild_silver_features(session)
 
-    feats = await session.scalars(select(SilverAccountFeatures).limit(500))
+    feats = await session.scalars(
+        select(SilverAccountFeatures).order_by(SilverAccountFeatures.velocity_score.desc()).limit(500)
+    )
     rows = list(feats.all())
     if not rows:
         return []

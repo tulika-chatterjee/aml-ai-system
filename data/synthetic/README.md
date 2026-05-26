@@ -8,8 +8,10 @@ Local-only CSV templates (not in git — copy from repo maintainer or use **Uplo
 |------|---------|
 | `sample_customers.csv` | 8 high-risk / PEP customers `CUST-9001` … `CUST-9008` |
 | `sample_transactions.csv` | 30 large-value ring transfers on `ACC-9001` … `ACC-9007` (plus low-risk control txs) |
+| `sample_one_customer.csv` | 1 customer — `CUST-9010` / `ACC-9010` |
+| `sample_one_customer_transactions.csv` | 10 transactions for that customer only |
 
-**Account ↔ customer link:** account `ACC-9001` maps to customer `CUST-9001` (same numeric suffix) in the detection pipeline.
+**Account ↔ customer link:** account `ACC-9001` maps to customer `CUST-9001` (same numeric suffix) in the detection pipeline. Same for `ACC-9010` → `CUST-9010`.
 
 ### How to use
 
