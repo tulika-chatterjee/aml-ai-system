@@ -424,39 +424,54 @@ code.inline-code {
   font-size: 11px;
 }
 
-.burnup-axis {
+.burndown-axis {
   stroke: #334155;
   stroke-width: 1.2;
 }
 
-.burnup-gridline {
+.burndown-gridline {
   stroke: #1f2937;
   stroke-width: 1;
   stroke-dasharray: 4 4;
 }
 
-.burnup-goal-line {
+.burndown-ideal-line {
   fill: none;
   stroke: #94a3b8;
   stroke-width: 1.6;
   stroke-dasharray: 5 4;
 }
 
-.burnup-actual-line {
+.burndown-actual-line {
   fill: none;
-  stroke: #38bdf8;
+  stroke: #f97316;
   stroke-width: 2.4;
 }
 
-.burnup-point {
-  fill: #38bdf8;
+.burndown-point {
+  fill: #f97316;
   stroke: #0f172a;
   stroke-width: 1;
 }
 
-.burnup-legend-label {
+.burndown-legend-label {
   fill: #cbd5e1;
   font-size: 11px;
+}
+
+.burndown-stack-low {
+  fill: #10b981;
+  opacity: 0.9;
+}
+
+.burndown-stack-medium {
+  fill: #f59e0b;
+  opacity: 0.9;
+}
+
+.burndown-stack-high {
+  fill: #ef4444;
+  opacity: 0.9;
 }
 
 .panel-head-chart {

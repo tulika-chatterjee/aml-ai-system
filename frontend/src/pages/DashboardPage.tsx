@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { AlertSummary } from "../api";
-import { AlertsBurnupChart } from "../components/AlertsBurnupChart";
+import { AlertsBurndownChart } from "../components/AlertsBurndownChart";
 import { ComplianceAgentChat } from "../components/ComplianceAgentChat";
 import { RiskDistributionChart } from "../components/RiskDistributionChart";
 import { alertsSeriesLastDays } from "../utils/format";
@@ -135,11 +135,11 @@ export function DashboardPage({ alerts, totalTransactions, casesOpen: _casesOpen
         <section className="panel elevate">
           <div className="panel-head panel-head-chart">
             <div className="panel-head-left">
-              <h3>Alerts burn-up</h3>
-              <span className="pill ghost">Last 7 days</span>
+              <h3>Alerts burndown</h3>
+              <span className="pill ghost">Last 7 days · by severity</span>
             </div>
           </div>
-          <AlertsBurnupChart series={series} />
+          <AlertsBurndownChart series={series} alerts={alerts} />
         </section>
       </section>
 
