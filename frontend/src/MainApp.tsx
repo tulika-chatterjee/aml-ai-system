@@ -59,6 +59,10 @@ export function MainApp({ onSignOut }: Props) {
   }, [refresh, refreshStats]);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [nav]);
+
+  useEffect(() => {
     api
       .health()
       .then(() => {
