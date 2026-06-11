@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { api, type AlertSummary } from "../api";
-import { AlertsBurndownChart } from "../components/AlertsBurndownChart";
+import { AlertsPieChart } from "../components/AlertsPieChart";
 import { ComplianceAgentChat } from "../components/ComplianceAgentChat";
 import { RiskDistributionChart } from "../components/RiskDistributionChart";
 import { SAMPLE_CUSTOMERS_CSV, SAMPLE_TRANSACTIONS_CSV } from "../demo/bundledSampleCsv";
@@ -212,11 +212,11 @@ export function DashboardPage({
         <section className="panel elevate">
           <div className="panel-head panel-head-chart">
             <div className="panel-head-left">
-              <h3>Alerts burndown</h3>
-              <span className="pill ghost">Last 7 days · by severity</span>
+              <h3>Alerts distribution</h3>
+              <span className="pill ghost">Last 7 days · pie chart</span>
             </div>
           </div>
-          <AlertsBurndownChart series={series} alerts={alerts} />
+          <AlertsPieChart series={series} />
         </section>
       </section>
 

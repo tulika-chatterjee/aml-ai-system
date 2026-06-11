@@ -10,8 +10,10 @@ export function AlertsPieChart({ series }: { series: Point[] }) {
 
   if (total === 0) {
     return (
-      <div className="chart-wrap chart-empty muted" role="img" aria-label="Alerts distribution">
-        No alerts in the last 7 days.
+      <div className="chart-wrap">
+        <p className="chart-empty muted" role="img" aria-label="Alerts distribution">
+          No alerts in the last 7 days.
+        </p>
       </div>
     );
   }
@@ -40,7 +42,7 @@ export function AlertsPieChart({ series }: { series: Point[] }) {
     });
 
   return (
-    <div className="chart-split pie-layout">
+    <div className="chart-wrap chart-split pie-layout">
       <svg viewBox="0 0 220 220" className="chart-svg chart-pie-svg" role="img" aria-label="Alerts share by day">
         {slices.map((s) => (
           <path key={s.label} d={s.d} fill={s.color} stroke="#0b0f17" strokeWidth="2" />
