@@ -30,6 +30,37 @@ def _load_corpus() -> list[RegulatoryChunk]:
     return out
 
 
+def _format_chunk_answer(chunk: RegulatoryChunk) -> list[str]:
+    """Turn markdown corpus text into readable answer lines (skip duplicate H1)."""
+
+    body_lines: list[str] = []
+    for line in chunk.text.strip().splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("# "):
+            continue
+        body_lines.append(stripped)
+    return body_lines
+
+
+def _next_steps_footer(top_doc_id: str) -> str:
+    if top_doc_id == "cdd_pep_enhanced":
+        return (
+            "\n---\n**Next steps:** apply your ML/CTF programme’s PEP / enhanced CDD policy; "
+            "obtain senior management approval where required; document source-of-wealth measures and ongoing monitoring."
+        )
+    if top_doc_id == "austrac_smr_guidance_stub":
+        return (
+            "\n---\n**Next steps:** document analyst facts, indicators, and suspicion decision; "
+            "escalate to compliance for SMR thresholds and AUSTRAC timelines."
+        )
+    return (
+        "\n---\n**Next steps:** map decisions to your ML/CTF programme & internal policy; "
+        "escalate to compliance for SMR thresholds and timelines."
+    )
+
+
 def synthesize_compliance_reply(message: str, context: dict[str, Any] | None) -> dict[str, Any]:
     corpus = _load_corpus()
     retrieved = retrieve(message, corpus, top_k=4) if corpus else []
@@ -55,25 +86,30 @@ def synthesize_compliance_reply(message: str, context: dict[str, Any] | None) ->
         )
         return {"reply": "\n".join(lines).strip(), "sources": []}
 
-    if not shown:
+    if not shown or shown[0].score <= 0:
         lines.append(
             "I couldn’t match your question tightly to the local corpus. Try terms like "
-            "**SMR**, **CDD**, **PEP**, **monitoring**, or **AUSTRAC**."
+            "**SMR**, **CDD**, **PEP**, **cdd_pep_enhanced**, **monitoring**, or **AUSTRAC**."
         )
         return {"reply": "\n".join(lines).strip(), "sources": []}
 
-    lines.append("Grounded excerpts from the **demo corpus**:\n")
+    top = shown[0]
+    lines.append(f"**{top.chunk.title}** (`{top.chunk.doc_id}`)\n")
+    lines.extend(_format_chunk_answer(top.chunk))
 
-    sources: list[dict[str, Any]] = []
-    for i, r in enumerate(shown, start=1):
-        excerpt = r.chunk.text.strip().replace("\n", " ")
-        if len(excerpt) > 480:
-            excerpt = excerpt[:480] + "…"
-        lines.append(f"{i}. **{r.chunk.title}** ({r.chunk.doc_id}) — _{excerpt}_")
-        sources.append({"doc_id": r.chunk.doc_id, "title": r.chunk.title, "score": r.score})
+    sources: list[dict[str, Any]] = [
+        {"doc_id": top.chunk.doc_id, "title": top.chunk.title, "score": top.score}
+    ]
 
-    lines.append(
-        "\n---\n**Next steps:** map decisions to your ML/CTF programme & internal policy; escalate to compliance "
-        "for SMR thresholds and timelines."
-    )
+    related = [r for r in shown[1:] if r.score > 0 and r.chunk.doc_id != top.chunk.doc_id]
+    if related:
+        lines.append("\n**Related corpus excerpts:**\n")
+        for i, r in enumerate(related, start=1):
+            excerpt = r.chunk.text.strip().replace("\n", " ")
+            if len(excerpt) > 320:
+                excerpt = excerpt[:320] + "…"
+            lines.append(f"{i}. **{r.chunk.title}** (`{r.chunk.doc_id}`) — _{excerpt}_")
+            sources.append({"doc_id": r.chunk.doc_id, "title": r.chunk.title, "score": r.score})
+
+    lines.append(_next_steps_footer(top.chunk.doc_id))
     return {"reply": "\n".join(lines).strip(), "sources": sources}

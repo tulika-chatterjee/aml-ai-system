@@ -48,23 +48,89 @@ PEP status alone is **not** proof of wrongdoing; it elevates monitoring and gove
   },
 ];
 
+const QUERY_STOP = new Set([
+  "what",
+  "is",
+  "are",
+  "the",
+  "a",
+  "an",
+  "how",
+  "when",
+  "where",
+  "why",
+  "does",
+  "do",
+  "can",
+  "could",
+  "should",
+  "would",
+  "about",
+  "tell",
+  "me",
+  "explain",
+  "define",
+  "meaning",
+  "of",
+  "for",
+  "and",
+  "or",
+]);
+
+function tokenizeQuery(query: string): Set<string> {
+  const tokens = new Set<string>();
+  const normalized = query.toLowerCase().replace(/,/g, " ");
+  for (const part of normalized.split(/\s+/)) {
+    if (part.length <= 2 || QUERY_STOP.has(part)) continue;
+    tokens.add(part);
+    for (const piece of part.replace(/-/g, "_").split("_")) {
+      if (piece.length > 2 && !QUERY_STOP.has(piece)) tokens.add(piece);
+    }
+  }
+  return tokens;
+}
+
+function docIdMatchBoost(query: string, docId: string): number {
+  const q = query.toLowerCase().trim();
+  const doc = docId.toLowerCase();
+  const docSpaced = doc.replace(/_/g, " ");
+  const qCompact = q.replace(/\s+/g, "_").replace(/-/g, "_");
+  if (qCompact.includes(doc) || q.includes(docSpaced)) return 10;
+  const pieces = doc.split("_").filter((p) => p.length > 2);
+  if (pieces.length > 0 && pieces.every((p) => qCompact.includes(p))) return 6;
+  return 0;
+}
+
+function formatChunkAnswer(text: string): string[] {
+  return text
+    .trim()
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("# "));
+}
+
+function nextStepsFooter(topDocId: string): string {
+  if (topDocId === "cdd_pep_enhanced") {
+    return "\n---\n**Next steps:** apply your ML/CTF programme’s PEP / enhanced CDD policy; obtain senior management approval where required; document source-of-wealth measures and ongoing monitoring.";
+  }
+  if (topDocId === "austrac_smr_guidance_stub") {
+    return "\n---\n**Next steps:** document analyst facts, indicators, and suspicion decision; escalate to compliance for SMR thresholds and AUSTRAC timelines.";
+  }
+  return "\n---\n**Next steps:** map decisions to your ML/CTF programme & internal policy; escalate to compliance for SMR thresholds and timelines.";
+}
+
 function retrieveLocal(query: string, topK: number): { chunk: LocalChunk; score: number }[] {
-  const qTokens = new Set(
-    query
-      .toLowerCase()
-      .replace(/,/g, " ")
-      .split(/\s+/)
-      .filter((t) => t.length > 2),
-  );
+  const qTokens = tokenizeQuery(query);
   const scored = CORPUS.map((c) => {
-    const hay = (c.title + " " + c.text).toLowerCase();
+    const hay = (c.doc_id + " " + c.title + " " + c.text).toLowerCase();
     let overlap = 0;
     for (const tok of qTokens) {
       if (hay.includes(tok)) overlap += 1;
     }
+    overlap += docIdMatchBoost(query, c.doc_id);
     return { chunk: c, score: overlap };
   });
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => b.score - a.score || a.chunk.doc_id.localeCompare(b.chunk.doc_id));
   return scored.slice(0, topK);
 }
 
@@ -96,22 +162,27 @@ export function synthesizeComplianceReplyLocal(
     if (last?.startsWith("_")) lines.push("");
   }
 
-  if (!shown.length) {
+  if (!shown.length || shown[0].score <= 0) {
     lines.push(
-      "I couldn’t match your question tightly to the local corpus. Try terms like **SMR**, **CDD**, **PEP**, **monitoring**, or **AUSTRAC**.",
+      "I couldn’t match your question tightly to the local corpus. Try terms like **SMR**, **CDD**, **PEP**, **cdd_pep_enhanced**, **monitoring**, or **AUSTRAC**.",
     );
     return lines.join("\n").trim();
   }
 
-  lines.push("Grounded excerpts from the **demo corpus**:\n");
-  shown.forEach((r, i) => {
-    let excerpt = r.chunk.text.replace(/\n+/g, " ").trim();
-    if (excerpt.length > 480) excerpt = excerpt.slice(0, 480) + "…";
-    lines.push(`${i + 1}. **${r.chunk.title}** (${r.chunk.doc_id}) — _${excerpt}_`);
-  });
+  const top = shown[0];
+  lines.push(`**${top.chunk.title}** (\`${top.chunk.doc_id}\`)\n`);
+  lines.push(...formatChunkAnswer(top.chunk.text));
 
-  lines.push(
-    "\n---\n**Next steps:** map decisions to your ML/CTF programme & internal policy; escalate to compliance for SMR thresholds and timelines.",
-  );
+  const related = shown.slice(1).filter((r) => r.score > 0 && r.chunk.doc_id !== top.chunk.doc_id);
+  if (related.length) {
+    lines.push("\n**Related corpus excerpts:**\n");
+    related.forEach((r, i) => {
+      let excerpt = r.chunk.text.replace(/\n+/g, " ").trim();
+      if (excerpt.length > 320) excerpt = excerpt.slice(0, 320) + "…";
+      lines.push(`${i + 1}. **${r.chunk.title}** (\`${r.chunk.doc_id}\`) — _${excerpt}_`);
+    });
+  }
+
+  lines.push(nextStepsFooter(top.chunk.doc_id));
   return lines.join("\n").trim();
 }
