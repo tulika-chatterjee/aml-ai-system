@@ -49,18 +49,25 @@ export function AlertsPieChart({ series }: { series: Point[] }) {
         ))}
       </svg>
       <ul className="pie-legend">
-        {series.map((p, i) => {
-          const pct = total ? Math.round((p.count / total) * 100) : 0;
-          return (
-            <li key={p.label}>
-              <span className="pie-swatch" style={{ background: SLICE_COLORS[i % SLICE_COLORS.length] }} aria-hidden />
-              <span className="pie-legend-day">{p.label.slice(5)}</span>
-              <span className="pie-legend-val">
-                {p.count} <span className="muted">({pct}%)</span>
-              </span>
-            </li>
-          );
-        })}
+        {series
+          .filter((p) => p.count > 0)
+          .map((p) => {
+            const colorIdx = Math.max(0, series.findIndex((s) => s.label === p.label));
+            const pct = total ? Math.round((p.count / total) * 100) : 0;
+            return (
+              <li key={p.label}>
+                <span
+                  className="pie-swatch"
+                  style={{ background: SLICE_COLORS[colorIdx % SLICE_COLORS.length] }}
+                  aria-hidden
+                />
+                <span className="pie-legend-day">{p.label.slice(5)}</span>
+                <span className="pie-legend-val">
+                  {p.count} <span className="muted">({pct}%)</span>
+                </span>
+              </li>
+            );
+          })}
       </ul>
     </div>
   );

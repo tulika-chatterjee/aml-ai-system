@@ -6,9 +6,12 @@ from random import Random
 from typing import Any
 
 
-def _ts(seed: int, i: int) -> datetime:
-    base = datetime.now(timezone.utc) - timedelta(hours=48)
-    return base + timedelta(minutes=i * 13 + seed % 17)
+def _ts(seed: int, i: int, n: int) -> datetime:
+    now = datetime.now(timezone.utc)
+    base = now - timedelta(days=7)
+    span_minutes = 7 * 24 * 60
+    offset = (i * span_minutes) // max(n, 1) + (seed % 53)
+    return base + timedelta(minutes=min(offset, span_minutes - 1))
 
 
 def generate_demo_customers(
@@ -70,7 +73,7 @@ def generate_demo_dataset(
                 "account_to": b,
                 "amount": amt,
                 "currency": "AUD",
-                "timestamp_utc": _ts(seed, i),
+                "timestamp_utc": _ts(seed, i, n_transactions),
                 "channel": rng.choice(["FPS", "BPAY", "BRANCH", "CARD"]),
                 "metadata": {
                     "linked_customer": customers[cust_idx]["customer_id"],

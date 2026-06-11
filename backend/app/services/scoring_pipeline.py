@@ -1,6 +1,6 @@
 """Orchestrates hybrid risk scoring + alert materialisation."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -34,7 +34,7 @@ async def run_detection_cycle(
 ) -> list[GoldAlert]:
     from app.services.feature_compute import rebuild_silver_features
 
-    await rebuild_silver_features(session)
+    await rebuild_silver_features(session, window_hours=7 * 24)
 
     feats = await session.scalars(
         select(SilverAccountFeatures).order_by(SilverAccountFeatures.velocity_score.desc()).limit(500)
@@ -57,6 +57,12 @@ async def run_detection_cycle(
     model.fit_reference(X)
 
     recent_tx = await fetch_recent_transactions(session, limit=4000)
+    account_latest_tx: dict[str, datetime] = {}
+    for t in recent_tx:
+        for acc in (t.account_from, t.account_to):
+            prev = account_latest_tx.get(acc)
+            if prev is None or t.timestamp_utc > prev:
+                account_latest_tx[acc] = t.timestamp_utc
     edges_by_account: dict[str, list[tuple[str, str, float]]] = {}
     for t in recent_tx:
         edges_by_account.setdefault(t.account_from, []).append(
@@ -143,6 +149,12 @@ async def run_detection_cycle(
         elif hybrid >= 0.5 or rule_hits:
             sev = "MEDIUM"
 
+        alert_at = account_latest_tx.get(r.account_id, now)
+        week_floor = now - timedelta(days=6)
+        if alert_at < week_floor:
+            slot = sum(ord(c) for c in r.account_id) % (7 * 24)
+            alert_at = week_floor + timedelta(hours=slot)
+
         alert = GoldAlert(
             id=str(uuid4()),
             customer_id=kyc.customer_id if kyc else None,
@@ -155,7 +167,7 @@ async def run_detection_cycle(
             graph_signals=graph_payload,
             austrac_refs=austrac_refs,
             explanation=inv["explanation_markdown"],
-            created_at=now,
+            created_at=alert_at,
             updated_at=now,
         )
         session.add(alert)

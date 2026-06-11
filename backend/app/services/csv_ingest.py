@@ -43,11 +43,16 @@ def _parse_timestamp(raw: str) -> datetime:
 
 
 def _normalize_tx_timestamp(ts: datetime, row_index: int) -> datetime:
-    """Keep uploaded rows in the 24h silver window (demo-friendly)."""
+    """Map uploads into the last 7 days so dashboard charts show daily spread."""
     now = datetime.now(timezone.utc)
-    if ts >= now - timedelta(hours=47):
+    if ts >= now - timedelta(days=7):
         return ts
-    return now - timedelta(hours=20 - (row_index % 18), minutes=(row_index * 7) % 60)
+    day_slot = row_index % 7
+    minute_slot = (row_index * 17) % (24 * 60)
+    start_of_day = (now - timedelta(days=6 - day_slot)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    return start_of_day + timedelta(minutes=minute_slot)
 
 
 def _parse_transaction_row(row: dict[str, str], row_index: int) -> dict[str, Any]:
