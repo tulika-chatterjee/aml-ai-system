@@ -58,11 +58,27 @@ async function uploadCsv<T>(path: string, file: File): Promise<T> {
   return parseJson<T>(res);
 }
 
+function networkErrorHint(path: string): string {
+  if (apiBase) {
+    return `Cannot reach API at ${apiBase}${path}. Confirm Render is running, CORS allows this origin, and VITE_API_URL is correct.`;
+  }
+  return `Cannot reach API at ${path}. Start the FastAPI backend on port 8000 (./backend/run_dev.sh) and use the Vite dev server so /api is proxied.`;
+}
+
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${apiBase}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${apiBase}${path}`, {
+      headers: { "Content-Type": "application/json" },
+      ...init,
+    });
+  } catch (e) {
+    const msg = (e as Error).message;
+    if (msg === "Failed to fetch" || msg.includes("NetworkError") || msg.includes("Load failed")) {
+      throw new Error(networkErrorHint(path));
+    }
+    throw e;
+  }
   if (!res.ok) {
     const text = await res.text();
     if (text.trimStart().startsWith("<!")) {
@@ -95,7 +111,11 @@ export const api = {
   health: () => json<{ status: string }>("/api/health"),
   stats: () =>
     json<{ transaction_count: number; customer_count: number; alert_count: number }>("/api/stats"),
-  detect: () => json<{ alerts_created: number; alert_ids: string[] }>("/api/detect", { method: "POST" }),
+  detect: () =>
+    json<{ alerts_created: number; alert_ids: string[] }>("/api/detect", {
+      method: "POST",
+      signal: AbortSignal.timeout(180_000),
+    }),
   uploadCustomersCsv: (file: File) =>
     uploadCsv<{ ingested_kyc: number; customer_ids: string[] }>("/api/upload/customers", file),
   uploadTransactionsCsv: (file: File) =>

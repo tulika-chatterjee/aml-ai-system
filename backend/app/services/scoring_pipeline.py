@@ -17,6 +17,12 @@ from app.config import get_settings
 from app.db.models import BronzeCustomerKyc, GoldAlert, SilverAccountFeatures
 
 
+def _as_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 async def _customer_for_account(session: AsyncSession, account_id: str) -> BronzeCustomerKyc | None:
     suffix = account_id.split("-")[-1]
     try:
@@ -34,7 +40,10 @@ async def run_detection_cycle(
 ) -> list[GoldAlert]:
     from app.services.feature_compute import rebuild_silver_features
 
-    await rebuild_silver_features(session, window_hours=7 * 24)
+    feature_count = await rebuild_silver_features(session, window_hours=7 * 24)
+    if feature_count == 0:
+        # Demo DBs often retain older synthetic timestamps — widen once instead of no-op.
+        feature_count = await rebuild_silver_features(session, window_hours=None)
 
     feats = await session.scalars(
         select(SilverAccountFeatures).order_by(SilverAccountFeatures.velocity_score.desc()).limit(500)
@@ -59,10 +68,11 @@ async def run_detection_cycle(
     recent_tx = await fetch_recent_transactions(session, limit=4000)
     account_latest_tx: dict[str, datetime] = {}
     for t in recent_tx:
+        ts = _as_utc(t.timestamp_utc)
         for acc in (t.account_from, t.account_to):
             prev = account_latest_tx.get(acc)
-            if prev is None or t.timestamp_utc > prev:
-                account_latest_tx[acc] = t.timestamp_utc
+            if prev is None or ts > prev:
+                account_latest_tx[acc] = ts
     edges_by_account: dict[str, list[tuple[str, str, float]]] = {}
     for t in recent_tx:
         edges_by_account.setdefault(t.account_from, []).append(
@@ -141,6 +151,7 @@ async def run_detection_cycle(
             triggers=triggers_serialized,
             ml_contribution=ml_payload,
             graph_signals=graph_payload,
+            use_llm=False,
         )
 
         sev = "LOW"
@@ -149,7 +160,7 @@ async def run_detection_cycle(
         elif hybrid >= 0.5 or rule_hits:
             sev = "MEDIUM"
 
-        alert_at = account_latest_tx.get(r.account_id, now)
+        alert_at = _as_utc(account_latest_tx.get(r.account_id, now))
         week_floor = now - timedelta(days=6)
         if alert_at < week_floor:
             slot = sum(ord(c) for c in r.account_id) % (7 * 24)

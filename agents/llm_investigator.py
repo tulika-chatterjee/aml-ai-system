@@ -40,6 +40,7 @@ async def synthesize_case_summary(
     ml_contribution: dict[str, Any],
     graph_signals: dict[str, Any],
     investigator_question: str | None = None,
+    use_llm: bool = True,
 ) -> dict[str, Any]:
     settings = get_settings()
     corpus_path = regulatory_docs_dir(settings)
@@ -58,7 +59,7 @@ async def synthesize_case_summary(
     explanation: str
     model_used = "template"
 
-    if settings.openai_api_key:
+    if use_llm and settings.openai_api_key:
         try:
             from langchain_core.messages import HumanMessage, SystemMessage
             from langchain_openai import ChatOpenAI

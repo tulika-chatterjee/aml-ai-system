@@ -260,7 +260,7 @@ export function MainApp({ onSignOut }: Props) {
 
   const toolbar = (
     <div className="toolbar">
-      <button type="button" className="btn primary sm" disabled={busy} onClick={runDetect}>
+      <button type="button" className="btn primary sm" disabled={busy || !apiOnline} onClick={runDetect}>
         Run detection cycle
       </button>
       <button type="button" className="btn sm" disabled={busy} onClick={handleRefreshAlerts}>

@@ -15,15 +15,22 @@ def _window_start(now: datetime, hours: int = 24) -> datetime:
     return now - timedelta(hours=hours)
 
 
-async def rebuild_silver_features(session: AsyncSession, window_hours: int = 24) -> int:
-    """Recompute rolling aggregates per account (both directions)."""
+async def rebuild_silver_features(
+    session: AsyncSession,
+    window_hours: int | None = 24,
+) -> int:
+    """Recompute rolling aggregates per account (both directions).
+
+    Pass ``window_hours=None`` to include all bronze transactions (demo fallback).
+    """
 
     now = datetime.now(timezone.utc)
-    start = _window_start(now, window_hours)
+    stmt = select(BronzeTransaction)
+    if window_hours is not None:
+        start = _window_start(now, window_hours)
+        stmt = stmt.where(BronzeTransaction.timestamp_utc >= start)
 
-    q = await session.scalars(
-        select(BronzeTransaction).where(BronzeTransaction.timestamp_utc >= start)
-    )
+    q = await session.scalars(stmt)
     recent = list(q.all())
 
     per_account: dict[str, dict[str, Any]] = defaultdict(
@@ -53,7 +60,7 @@ async def rebuild_silver_features(session: AsyncSession, window_hours: int = 24)
         velocity_score = vc * (1.0 + min(vol / 50000.0, 3.0))
         sf = SilverAccountFeatures(
             account_id=acc,
-            window_hours=window_hours,
+            window_hours=window_hours if window_hours is not None else 0,
             txn_count=int(agg["txn_count"]),
             total_volume=agg["total_volume"],
             velocity_score=velocity_score,

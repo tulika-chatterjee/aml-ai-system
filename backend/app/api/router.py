@@ -118,11 +118,14 @@ async def dashboard_stats(session: AsyncSession = Depends(get_db)) -> dict[str, 
 
 @router.post("/detect")
 async def detect(session: AsyncSession = Depends(get_db)) -> dict[str, Any]:
-    await session.execute(delete(GoldCase))
-    await session.execute(delete(GoldAlert))
-    await session.commit()
-    alerts = await run_detection_cycle(session)
-    return {"alerts_created": len(alerts), "alert_ids": [a.id for a in alerts]}
+    try:
+        await session.execute(delete(GoldCase))
+        await session.execute(delete(GoldAlert))
+        await session.commit()
+        alerts = await run_detection_cycle(session)
+        return {"alerts_created": len(alerts), "alert_ids": [a.id for a in alerts]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Detection cycle failed: {e}") from e
 
 
 @router.get("/alerts")
